@@ -9,6 +9,8 @@ servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 servidor.bind((HOST, PORTA))
 
+servidor.listen()
+
 votos = {
     "1": 0,
     "2": 0,

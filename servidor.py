@@ -2,21 +2,61 @@ import socket
 import threading
 
 HOST = "0.0.0.0"
-PORTA =5005
+PORTA = 5005
 
+# Cria o socket utilizando IPv4 e TCP
 servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-servidor.bind(HOST, PORTA)
-servidor.listen()
+servidor.bind((HOST, PORTA))
 
-conexao, endereco = servidor.accept()
+votos = {
+    "1": 0,
+    "2": 0,
+    "3": 0
+}
 
-print("Cliente conectado:", endereco)
+# Bloqueio para evitar que duas threads alterem os votos ao mesmo tempo
+lock = threading.Lock()
 
-mensagem = conexao.recv(1024)
+def atender_cliente(conexao, endereco):
+    print("Cliente conectado:", endereco)
 
-mensagem.decode()
+    mensagem = conexao.recv(1024)
 
-conexao.sendall("Voto recebido!".encode())
+    mensagem = mensagem.decode()
+    mensagem = mensagem.strip()
 
-conexao.close()
+    if mensagem in votos:
+
+        # Protege a atualizacao dos votos e a montagem da apuracao
+        with lock:
+            votos[mensagem] += 1
+
+            # Monta a apuracao com a quantidade de votos de cada candidato
+            resultado = []
+            for candidato, quantidade in votos.items():
+                resultado.append(f"Candidato {candidato}: {quantidade}")
+
+            mensagem = "Voto recebido!\n" + "\n".join(resultado)
+
+        # Envia a confirmacao e a apuracao para o cliente
+        conexao.sendall(mensagem.encode())
+
+    else:
+        # Informa ao cliente que o voto enviado nao e valido
+        conexao.sendall("Voto invalido!".encode())
+
+    # Encerra a conexao com esse cliente
+    conexao.close()
+
+
+while True:
+
+    # Aceita uma nova conexao e obtem o endereco do cliente
+    conexao, endereco = servidor.accept()
+
+    # Cria uma thread para atender o cliente sem bloquear os demais
+    threading.Thread(
+        target=atender_cliente,
+        args=(conexao, endereco)
+    ).start()
